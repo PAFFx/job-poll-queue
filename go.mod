@@ -3,6 +3,7 @@ module github.com/PAFFx/job-poll-queue
 go 1.24.1
 
 require (
+	github.com/Netflix/go-env v0.1.2
 	github.com/gofiber/fiber/v2 v2.52.2
 	github.com/google/uuid v1.6.0
 )

@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/PAFFx/job-poll-queue/api"
+	"github.com/PAFFx/job-poll-queue/config"
 	"github.com/PAFFx/job-poll-queue/queue"
 )
 
@@ -24,14 +24,13 @@ func main() {
 	server := api.NewServer(jobQueue)
 
 	// Get port from environment variable or use default
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000"
+	envVars, err := config.GetEnvVariables()
+	if err != nil {
+		log.Fatalf("Failed to get environment variables: %v", err)
 	}
-
 	// Start the server
-	log.Printf("Starting job queue API server on port %s", port)
-	if err := server.Start(fmt.Sprintf(":%s", port)); err != nil {
+	log.Printf("Starting job queue API server on port %s", envVars.Port)
+	if err := server.Start(fmt.Sprintf(":%s", envVars.Port)); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
