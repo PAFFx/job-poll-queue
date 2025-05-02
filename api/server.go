@@ -1,6 +1,9 @@
 package api
 
 import (
+	"github.com/PAFFx/job-poll-queue/api/admin"
+	"github.com/PAFFx/job-poll-queue/api/submit"
+	"github.com/PAFFx/job-poll-queue/api/worker"
 	"github.com/PAFFx/job-poll-queue/queue"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -47,19 +50,17 @@ func NewServer(jobQueue *queue.Queue) *Server {
 func (s *Server) registerRoutes() {
 	api := s.app.Group("/api")
 
-	// Job queue endpoints
-	jobs := api.Group("/jobs")
-	jobs.Post("/", s.pushJob)           // Submit a new job
-	jobs.Get("/", s.getQueueStatus)     // Get queue status
-	jobs.Get("/next", s.getNextJob)     // Get the next job from the queue
-	jobs.Delete("/clear", s.clearQueue) // Clear the queue
+	adminGroup := api.Group("/admin")
+	adminHandler := admin.NewHandler(s.jobQueue)
+	adminHandler.RegisterRoutes(adminGroup)
 
-	// Health check
-	s.app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status": "ok",
-		})
-	})
+	submitGroup := api.Group("/submit")
+	submitHandler := submit.NewHandler(s.jobQueue)
+	submitHandler.RegisterRoutes(submitGroup)
+
+	workerGroup := api.Group("/worker")
+	workerHandler := worker.NewHandler(s.jobQueue)
+	workerHandler.RegisterRoutes(workerGroup)
 }
 
 // Start starts the API server on the given address
@@ -96,39 +97,5 @@ func (s *Server) pushJob(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Job submitted successfully",
 		"job_id":  job.ID,
-	})
-}
-
-// getQueueStatus returns the current status of the job queue
-func (s *Server) getQueueStatus(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{
-		"queue_size": s.jobQueue.Size(),
-	})
-}
-
-// getNextJob gets the next job from the queue
-func (s *Server) getNextJob(c *fiber.Ctx) error {
-	job, err := s.jobQueue.Pop()
-	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Failed to pop job from queue")
-	}
-
-	if job == nil {
-		return c.Status(fiber.StatusNoContent).JSON(fiber.Map{
-			"message": "Queue is empty",
-		})
-	}
-
-	return c.JSON(job)
-}
-
-// clearQueue clears all jobs from the queue
-func (s *Server) clearQueue(c *fiber.Ctx) error {
-	if err := s.jobQueue.Clear(); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Failed to clear queue")
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Queue cleared successfully",
 	})
 }
