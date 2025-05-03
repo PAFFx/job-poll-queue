@@ -1,6 +1,8 @@
 package submit
 
 import (
+	"encoding/json"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/PAFFx/job-poll-queue/queue"
@@ -20,37 +22,35 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 
 // SubmitJobSyncHandler handles synchronous job submission
 func (h *Handler) SubmitJobSyncHandler(c *fiber.Ctx) error {
-	// Parse job data from request
-	type JobRequest struct {
-		Payload string            `json:"payload"`
-		Headers map[string]string `json:"headers,omitempty"`
-	}
+	// Get the raw request body as payload
+	rawBody := c.Body()
 
-	var jobReq JobRequest
-	if err := c.BodyParser(&jobReq); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid job data")
-	}
+	// Convert raw body to JSON string for the payload
+	payload := string(rawBody)
+
+	// Use standard headers from the request
+	headers := make(map[string]string)
+	c.Request().Header.VisitAll(func(key, value []byte) {
+		headers[string(key)] = string(value)
+	})
 
 	// Submit job and wait for result
-	result, err := h.SubmitJobSync(jobReq.Payload, jobReq.Headers)
+	result, err := h.SubmitJobSync(payload, headers)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to process job: "+err.Error())
 	}
 
-	// Check if job failed
-	if result.Status == queue.JobStatusFailed {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"job_id": result.ID,
-			"status": string(result.Status),
-			"error":  result.Error,
-		})
+	// Parse the result payload as JSON if possible
+	var resultPayload interface{}
+	if err := json.Unmarshal([]byte(result.Result), &resultPayload); err != nil {
+		// If it's not valid JSON, use the raw string
+		resultPayload = result.Result
 	}
 
-	// Return the successful result
+	// Return the job result
 	return c.JSON(fiber.Map{
 		"job_id":       result.ID,
-		"status":       string(result.Status),
-		"result":       result.Result,
+		"payload":      resultPayload,
 		"created_at":   result.CreatedAt,
 		"completed_at": result.CompletedAt,
 	})
