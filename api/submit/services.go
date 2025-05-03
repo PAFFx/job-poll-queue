@@ -33,5 +33,5 @@ func (h *Handler) SubmitJobSync(payload string, headers map[string]string, timeo
 	}
 
 	// Wait for the result
-	return h.jobQueue.WaitForResult(jobID, timeout)
+	return h.jobQueue.GetStatusManager().WaitForCompletion(jobID, timeout)
 }

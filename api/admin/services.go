@@ -6,10 +6,12 @@ import (
 
 // QueueService provides additional functionality for queue operations
 func (h *Handler) GetQueueStatistics() map[string]interface{} {
-	// TODO: Add jobs status count separately
 	return map[string]interface{}{
-		"size":   h.jobQueue.Size(),
-		"status": "operational",
+		"total":     h.jobQueue.GetStatusManager().CountTotalJobs(),
+		"pending":   h.jobQueue.GetStatusManager().CountPendingJobs(),
+		"running":   h.jobQueue.GetStatusManager().CountProcessingJobs(),
+		"completed": h.jobQueue.GetStatusManager().CountCompletedJobs(),
+		"failed":    h.jobQueue.GetStatusManager().CountFailedJobs(),
 	}
 }
 
@@ -20,8 +22,8 @@ func (h *Handler) ClearQueue() error {
 		return err
 	}
 
-	// Clear results
-	if err := h.jobQueue.ClearResults(); err != nil {
+	// Clear job status
+	if err := h.jobQueue.GetStatusManager().Clear(); err != nil {
 		return err
 	}
 

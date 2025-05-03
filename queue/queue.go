@@ -34,7 +34,7 @@ type Queue struct {
 	messages  []Message
 	storage   *Storage
 	mutex     sync.Mutex
-	resultMgr *ResultManager
+	statusMgr *JobStatusManager
 }
 
 // NewQueue creates a new queue with the given name and storage directory
@@ -45,8 +45,8 @@ func NewQueue(name string, storageDir string) (*Queue, error) {
 		return nil, err
 	}
 
-	// Initialize result manager
-	resultMgr, err := NewResultManager(storage)
+	// Initialize job status manager
+	statusMgr, err := NewJobStatusManager(storage)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func NewQueue(name string, storageDir string) (*Queue, error) {
 		messages:  []Message{},
 		storage:   storage,
 		mutex:     sync.Mutex{},
-		resultMgr: resultMgr,
+		statusMgr: statusMgr,
 	}
 
 	// Load existing messages from storage
@@ -67,6 +67,14 @@ func NewQueue(name string, storageDir string) (*Queue, error) {
 	q.messages = messages
 
 	return q, nil
+}
+
+func (q *Queue) GetStatusManager() *JobStatusManager {
+	return q.statusMgr
+}
+
+func (q *Queue) GetStorage() *Storage {
+	return q.storage
 }
 
 // Push adds a message to the end of the queue and persists to storage
@@ -82,8 +90,8 @@ func (q *Queue) Push(msg Message) error {
 
 	q.messages = append(q.messages, msg)
 
-	// Register a waiter for this job
-	q.resultMgr.RegisterWaiter(msg.ID)
+	// Register job in status manager
+	q.statusMgr.RegisterJob(&msg)
 
 	return q.storage.SaveQueue(q.messages)
 }
@@ -105,6 +113,9 @@ func (q *Queue) Pop() (*Message, error) {
 	msg.Status = JobStatusProcessing
 	msg.UpdatedAt = time.Now()
 
+	// Update status in status manager
+	q.statusMgr.UpdateStatus(msg.ID, JobStatusProcessing)
+
 	// Remove it from the queue
 	q.messages = q.messages[1:]
 
@@ -116,33 +127,6 @@ func (q *Queue) Pop() (*Message, error) {
 	return &msg, nil
 }
 
-// SubmitResult stores the result of a processed job
-func (q *Queue) SubmitResult(jobID string, result string, err error) error {
-	return q.resultMgr.SubmitResult(jobID, result, err)
-}
-
-// WaitForResult waits for a job result with a timeout
-func (q *Queue) WaitForResult(jobID string, timeout time.Duration) (*Message, error) {
-	return q.resultMgr.WaitForResult(jobID, timeout)
-}
-
-// GetResult retrieves a job result if available
-func (q *Queue) GetResult(jobID string) (*Message, error) {
-	return q.resultMgr.GetResult(jobID)
-}
-
-// Size returns the current number of messages in the queue
-func (q *Queue) Size() int {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-	return len(q.messages)
-}
-
-// ResultsCount returns the number of completed job results
-func (q *Queue) ResultsCount() int {
-	return q.resultMgr.Count()
-}
-
 // Clear removes all messages from the queue
 func (q *Queue) Clear() error {
 	q.mutex.Lock()
@@ -150,9 +134,4 @@ func (q *Queue) Clear() error {
 
 	q.messages = []Message{}
 	return q.storage.SaveQueue(q.messages)
-}
-
-// ClearResults removes all stored results
-func (q *Queue) ClearResults() error {
-	return q.resultMgr.Clear()
 }

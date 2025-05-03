@@ -19,12 +19,12 @@ func (h *Handler) RequestJob() (*queue.Message, error) {
 
 // CompleteJob marks a job as completed with the given result
 func (h *Handler) CompleteJob(jobID string, result string) error {
-	return h.jobQueue.SubmitResult(jobID, result, nil)
+	return h.jobQueue.GetStatusManager().SubmitResult(jobID, result, nil)
 }
 
 // FailJob marks a job as failed with the given error
 func (h *Handler) FailJob(jobID string, errorMessage string) error {
-	return h.jobQueue.SubmitResult(jobID, "", errors.New(errorMessage))
+	return h.jobQueue.GetStatusManager().SubmitResult(jobID, "", errors.New(errorMessage))
 }
 
 // FormatJobResponse formats a job for response to workers
