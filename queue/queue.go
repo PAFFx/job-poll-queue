@@ -28,19 +28,19 @@ type Message struct {
 	CompletedAt *time.Time        `json:"completed_at,omitempty"`
 }
 
-// Queue implements a FIFO queue with disk persistence
+// Queue implements a FIFO queue with storage persistence
 type Queue struct {
 	name      string
 	messages  []Message
-	storage   *DiskStorage
+	storage   *Storage
 	mutex     sync.Mutex
 	resultMgr *ResultManager
 }
 
 // NewQueue creates a new queue with the given name and storage directory
 func NewQueue(name string, storageDir string) (*Queue, error) {
-	// Initialize disk storage
-	storage, err := NewDiskStorage(name, storageDir)
+	// Initialize storage storage
+	storage, err := NewStorage(name, storageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func NewQueue(name string, storageDir string) (*Queue, error) {
 		resultMgr: resultMgr,
 	}
 
-	// Load existing messages from disk
+	// Load existing messages from storage
 	messages, err := storage.LoadQueue()
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func NewQueue(name string, storageDir string) (*Queue, error) {
 	return q, nil
 }
 
-// Push adds a message to the end of the queue and persists to disk
+// Push adds a message to the end of the queue and persists to storage
 func (q *Queue) Push(msg Message) error {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()

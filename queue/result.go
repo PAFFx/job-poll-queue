@@ -10,12 +10,12 @@ import (
 type ResultManager struct {
 	results map[string]Message // Map job ID to message with results
 	waiters map[string]chan Message
-	storage *DiskStorage
+	storage *Storage
 	mutex   sync.Mutex
 }
 
 // NewResultManager creates a new result manager
-func NewResultManager(storage *DiskStorage) (*ResultManager, error) {
+func NewResultManager(storage *Storage) (*ResultManager, error) {
 	rm := &ResultManager{
 		results: make(map[string]Message),
 		waiters: make(map[string]chan Message),
