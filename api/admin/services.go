@@ -11,7 +11,6 @@ func (h *Handler) GetQueueStatistics() map[string]interface{} {
 		"pending":   h.jobQueue.GetStatusManager().CountPendingJobs(),
 		"running":   h.jobQueue.GetStatusManager().CountProcessingJobs(),
 		"completed": h.jobQueue.GetStatusManager().CountCompletedJobs(),
-		"failed":    h.jobQueue.GetStatusManager().CountFailedJobs(),
 	}
 }
 

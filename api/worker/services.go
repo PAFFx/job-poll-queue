@@ -17,14 +17,11 @@ func (h *Handler) RequestJob() (*queue.Message, error) {
 	return job, nil
 }
 
-// CompleteJob marks a job as completed with the given result
-func (h *Handler) CompleteJob(jobID string, result string) error {
-	return h.jobQueue.GetStatusManager().SubmitResult(jobID, result, nil)
-}
-
-// FailJob marks a job as failed with the given error
-func (h *Handler) FailJob(jobID string, errorMessage string) error {
-	return h.jobQueue.GetStatusManager().SubmitResult(jobID, "", errors.New(errorMessage))
+// CompleteJob marks a job as completed with the given payload
+func (h *Handler) CompleteJob(jobID string, payload string) error {
+	// Just mark the job as completed with the provided payload
+	// Let the payload itself contain any error information if needed
+	return h.jobQueue.GetStatusManager().SubmitResult(jobID, payload, nil)
 }
 
 // FormatJobResponse formats a job for response to workers
@@ -42,17 +39,4 @@ func (h *Handler) ValidateJobID(jobID string) error {
 		return errors.New("job ID is required")
 	}
 	return nil
-}
-
-// FormatJobResult formats a result response
-func (h *Handler) FormatJobResultResponse(jobID string, success bool) fiber.Map {
-	message := "Job completed successfully"
-	if !success {
-		message = "Job marked as failed"
-	}
-
-	return fiber.Map{
-		"message": message,
-		"job_id":  jobID,
-	}
 }

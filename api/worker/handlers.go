@@ -16,7 +16,6 @@ func NewHandler(jobQueue *queue.Queue) *Handler {
 func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/poll", h.RequestJobHandler)
 	router.Post("/complete/:id", h.CompleteJobHandler)
-	router.Post("/fail/:id", h.FailJobHandler)
 }
 
 func (h *Handler) RequestJobHandler(c *fiber.Ctx) error {
@@ -40,46 +39,21 @@ func (h *Handler) CompleteJobHandler(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
-	// Parse result data
-	type ResultRequest struct {
-		Result string `json:"result"`
+	// Get the raw request body as the result
+	result := string(c.Body())
+
+	// If body is empty, set a default message
+	if result == "" {
+		result = "{}"
 	}
 
-	var req ResultRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid result data")
-	}
-
-	if err := h.CompleteJob(jobID, req.Result); err != nil {
+	// Complete the job with the provided payload
+	if err := h.CompleteJob(jobID, result); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to complete job: "+err.Error())
 	}
 
-	return c.JSON(h.FormatJobResultResponse(jobID, true))
-}
-
-func (h *Handler) FailJobHandler(c *fiber.Ctx) error {
-	jobID := c.Params("id")
-	if err := h.ValidateJobID(jobID); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	}
-
-	// Parse error data
-	type ErrorRequest struct {
-		Error string `json:"error"`
-	}
-
-	var req ErrorRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid error data")
-	}
-
-	if req.Error == "" {
-		return fiber.NewError(fiber.StatusBadRequest, "Error message is required")
-	}
-
-	if err := h.FailJob(jobID, req.Error); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Failed to mark job as failed: "+err.Error())
-	}
-
-	return c.JSON(h.FormatJobResultResponse(jobID, false))
+	return c.JSON(fiber.Map{
+		"message": "Job completed",
+		"job_id":  jobID,
+	})
 }

@@ -67,7 +67,7 @@ func (jsm *JobStatusManager) UpdateStatus(jobID string, status JobStatus) error 
 }
 
 // SubmitResult stores the result of a processed job
-func (jsm *JobStatusManager) SubmitResult(jobID string, result string, err error) error {
+func (jsm *JobStatusManager) SubmitResult(jobID string, payload string, err error) error {
 	jsm.mutex.Lock()
 	defer jsm.mutex.Unlock()
 
@@ -84,17 +84,18 @@ func (jsm *JobStatusManager) SubmitResult(jobID string, result string, err error
 		}
 	}
 
-	// Update with results
-	job.Result = result
+	// Update with payload
+	job.Result = payload
 	now := time.Now()
 	job.UpdatedAt = now
 	job.CompletedAt = &now
 
+	// Mark job as completed
+	job.Status = JobStatusCompleted
+
+	// Store error information if present
 	if err != nil {
-		job.Status = JobStatusFailed
 		job.Error = err.Error()
-	} else {
-		job.Status = JobStatusCompleted
 	}
 
 	// Store the updated job
@@ -124,7 +125,7 @@ func (jsm *JobStatusManager) WaitForCompletion(jobID string, timeout time.Durati
 
 	// Check if we already have the job in completed/failed state
 	if job, exists := jsm.statusMap[jobID]; exists {
-		if job.Status == JobStatusCompleted || job.Status == JobStatusFailed {
+		if job.Status == JobStatusCompleted {
 			jsm.mutex.Unlock()
 			return &job, nil
 		}
@@ -154,7 +155,7 @@ func (jsm *JobStatusManager) WaitForCompletionWithoutTimeout(jobID string) (*Mes
 
 	// Check if we already have the job in completed/failed state
 	if job, exists := jsm.statusMap[jobID]; exists {
-		if job.Status == JobStatusCompleted || job.Status == JobStatusFailed {
+		if job.Status == JobStatusCompleted {
 			jsm.mutex.Unlock()
 			return &job, nil
 		}
@@ -224,18 +225,6 @@ func (jsm *JobStatusManager) CountCompletedJobs() int {
 	count := 0
 	for _, job := range jsm.statusMap {
 		if job.Status == JobStatusCompleted {
-			count++
-		}
-	}
-	return count
-}
-
-func (jsm *JobStatusManager) CountFailedJobs() int {
-	jsm.mutex.Lock()
-	defer jsm.mutex.Unlock()
-	count := 0
-	for _, job := range jsm.statusMap {
-		if job.Status == JobStatusFailed {
 			count++
 		}
 	}

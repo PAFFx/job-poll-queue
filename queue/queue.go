@@ -12,7 +12,6 @@ const (
 	JobStatusPending    JobStatus = "pending"
 	JobStatusProcessing JobStatus = "processing"
 	JobStatusCompleted  JobStatus = "completed"
-	JobStatusFailed     JobStatus = "failed"
 )
 
 // Message represents an item in the queue
