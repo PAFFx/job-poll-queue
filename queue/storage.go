@@ -7,27 +7,27 @@ import (
 	"path/filepath"
 )
 
-// DiskStorage handles persistence operations for the queue
-type DiskStorage struct {
+// Storage handles persistence operations for the queue
+type Storage struct {
 	queuePath  string
 	resultPath string
 }
 
-// NewDiskStorage creates a new disk storage manager
-func NewDiskStorage(name string, storageDir string) (*DiskStorage, error) {
+// NewStorage creates a new storage manager
+func NewStorage(name string, storageDir string) (*Storage, error) {
 	// Create storage directory if it doesn't exist
 	if err := os.MkdirAll(storageDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
-	return &DiskStorage{
+	return &Storage{
 		queuePath:  filepath.Join(storageDir, fmt.Sprintf("%s.json", name)),
 		resultPath: filepath.Join(storageDir, fmt.Sprintf("%s-results.json", name)),
 	}, nil
 }
 
-// SaveQueue persists the queue messages to disk
-func (d *DiskStorage) SaveQueue(messages []Message) error {
+// SaveQueue persists the queue messages to storage
+func (d *Storage) SaveQueue(messages []Message) error {
 	data, err := json.Marshal(messages)
 	if err != nil {
 		return fmt.Errorf("failed to marshal queue data: %w", err)
@@ -47,8 +47,8 @@ func (d *DiskStorage) SaveQueue(messages []Message) error {
 	return nil
 }
 
-// LoadQueue loads the queue state from disk
-func (d *DiskStorage) LoadQueue() ([]Message, error) {
+// LoadQueue loads the queue state from storage
+func (d *Storage) LoadQueue() ([]Message, error) {
 	var messages []Message
 
 	// Check if file exists
@@ -60,7 +60,7 @@ func (d *DiskStorage) LoadQueue() ([]Message, error) {
 
 	data, err := os.ReadFile(d.queuePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read queue data from disk: %w", err)
+		return nil, fmt.Errorf("failed to read queue data from storage: %w", err)
 	}
 
 	if err := json.Unmarshal(data, &messages); err != nil {
@@ -70,8 +70,8 @@ func (d *DiskStorage) LoadQueue() ([]Message, error) {
 	return messages, nil
 }
 
-// SaveResults persists the results to disk
-func (d *DiskStorage) SaveResults(results map[string]Message) error {
+// SaveResults persists the results to storage
+func (d *Storage) SaveResults(results map[string]Message) error {
 	data, err := json.Marshal(results)
 	if err != nil {
 		return fmt.Errorf("failed to marshal results data: %w", err)
@@ -91,8 +91,8 @@ func (d *DiskStorage) SaveResults(results map[string]Message) error {
 	return nil
 }
 
-// LoadResults loads the results from disk
-func (d *DiskStorage) LoadResults() (map[string]Message, error) {
+// LoadResults loads the results from storage
+func (d *Storage) LoadResults() (map[string]Message, error) {
 	results := make(map[string]Message)
 
 	// Check if file exists
@@ -104,7 +104,7 @@ func (d *DiskStorage) LoadResults() (map[string]Message, error) {
 
 	data, err := os.ReadFile(d.resultPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read results data from disk: %w", err)
+		return nil, fmt.Errorf("failed to read results data from storage: %w", err)
 	}
 
 	if err := json.Unmarshal(data, &results); err != nil {
