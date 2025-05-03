@@ -8,7 +8,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/google/uuid"
 )
 
 // Server represents the API server
@@ -66,36 +65,4 @@ func (s *Server) registerRoutes() {
 // Start starts the API server on the given address
 func (s *Server) Start(address string) error {
 	return s.app.Listen(address)
-}
-
-// pushJob handles job submission
-func (s *Server) pushJob(c *fiber.Ctx) error {
-	// Parse job data from request
-	type JobRequest struct {
-		Payload string            `json:"payload"`
-		Headers map[string]string `json:"headers,omitempty"`
-	}
-
-	var jobReq JobRequest
-	if err := c.BodyParser(&jobReq); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid job data")
-	}
-
-	// Create a new job
-	job := queue.Message{
-		ID:      uuid.New().String(),
-		Payload: jobReq.Payload,
-		Headers: jobReq.Headers,
-	}
-
-	// Push to queue
-	if err := s.jobQueue.Push(job); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Failed to push job to queue")
-	}
-
-	// Return job info
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Job submitted successfully",
-		"job_id":  job.ID,
-	})
 }
