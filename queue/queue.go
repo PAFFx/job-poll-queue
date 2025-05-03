@@ -1,48 +1,70 @@
 package queue
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
+	"time"
+)
+
+// JobStatus represents the current status of a job
+type JobStatus string
+
+const (
+	JobStatusPending    JobStatus = "pending"
+	JobStatusProcessing JobStatus = "processing"
+	JobStatusCompleted  JobStatus = "completed"
+	JobStatusFailed     JobStatus = "failed"
 )
 
 // Message represents an item in the queue
 type Message struct {
-	ID      string            `json:"id"`
-	Payload string            `json:"payload"`
-	Headers map[string]string `json:"headers,omitempty"`
+	ID          string            `json:"id"`
+	Payload     string            `json:"payload"`
+	Headers     map[string]string `json:"headers,omitempty"`
+	Status      JobStatus         `json:"status"`
+	Result      string            `json:"result,omitempty"`
+	Error       string            `json:"error,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+	CompletedAt *time.Time        `json:"completed_at,omitempty"`
 }
 
 // Queue implements a FIFO queue with disk persistence
 type Queue struct {
 	name      string
 	messages  []Message
-	storePath string
+	storage   *DiskStorage
 	mutex     sync.Mutex
+	resultMgr *ResultManager
 }
 
 // NewQueue creates a new queue with the given name and storage directory
 func NewQueue(name string, storageDir string) (*Queue, error) {
+	// Initialize disk storage
+	storage, err := NewDiskStorage(name, storageDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize result manager
+	resultMgr, err := NewResultManager(storage)
+	if err != nil {
+		return nil, err
+	}
+
 	q := &Queue{
 		name:      name,
 		messages:  []Message{},
-		storePath: filepath.Join(storageDir, fmt.Sprintf("%s.json", name)),
+		storage:   storage,
 		mutex:     sync.Mutex{},
+		resultMgr: resultMgr,
 	}
 
-	// Create storage directory if it doesn't exist
-	if err := os.MkdirAll(storageDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create storage directory: %w", err)
+	// Load existing messages from disk
+	messages, err := storage.LoadQueue()
+	if err != nil {
+		return nil, err
 	}
-
-	// Load existing messages from disk if file exists
-	if _, err := os.Stat(q.storePath); err == nil {
-		if err := q.loadFromDisk(); err != nil {
-			return nil, fmt.Errorf("failed to load queue from disk: %w", err)
-		}
-	}
+	q.messages = messages
 
 	return q, nil
 }
@@ -52,8 +74,18 @@ func (q *Queue) Push(msg Message) error {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
+	// Initialize job fields
+	now := time.Now()
+	msg.Status = JobStatusPending
+	msg.CreatedAt = now
+	msg.UpdatedAt = now
+
 	q.messages = append(q.messages, msg)
-	return q.saveToDisk()
+
+	// Register a waiter for this job
+	q.resultMgr.RegisterWaiter(msg.ID)
+
+	return q.storage.SaveQueue(q.messages)
 }
 
 // Pop removes and returns the first message from the queue
@@ -69,15 +101,34 @@ func (q *Queue) Pop() (*Message, error) {
 	// Get the first message
 	msg := q.messages[0]
 
+	// Update status to processing
+	msg.Status = JobStatusProcessing
+	msg.UpdatedAt = time.Now()
+
 	// Remove it from the queue
 	q.messages = q.messages[1:]
 
 	// Save the updated queue state
-	if err := q.saveToDisk(); err != nil {
-		return nil, fmt.Errorf("failed to persist queue after pop: %w", err)
+	if err := q.storage.SaveQueue(q.messages); err != nil {
+		return nil, err
 	}
 
 	return &msg, nil
+}
+
+// SubmitResult stores the result of a processed job
+func (q *Queue) SubmitResult(jobID string, result string, err error) error {
+	return q.resultMgr.SubmitResult(jobID, result, err)
+}
+
+// WaitForResult waits for a job result with a timeout
+func (q *Queue) WaitForResult(jobID string, timeout time.Duration) (*Message, error) {
+	return q.resultMgr.WaitForResult(jobID, timeout)
+}
+
+// GetResult retrieves a job result if available
+func (q *Queue) GetResult(jobID string) (*Message, error) {
+	return q.resultMgr.GetResult(jobID)
 }
 
 // Size returns the current number of messages in the queue
@@ -87,39 +138,9 @@ func (q *Queue) Size() int {
 	return len(q.messages)
 }
 
-// saveToDisk persists the queue to disk
-func (q *Queue) saveToDisk() error {
-	data, err := json.Marshal(q.messages)
-	if err != nil {
-		return fmt.Errorf("failed to marshal queue data: %w", err)
-	}
-
-	// Write to temporary file first to avoid corruption
-	tempFile := q.storePath + ".tmp"
-	if err := os.WriteFile(tempFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write queue data to temp file: %w", err)
-	}
-
-	// Rename temp file to actual file (atomic operation)
-	if err := os.Rename(tempFile, q.storePath); err != nil {
-		return fmt.Errorf("failed to rename temp file: %w", err)
-	}
-
-	return nil
-}
-
-// loadFromDisk loads the queue state from disk
-func (q *Queue) loadFromDisk() error {
-	data, err := os.ReadFile(q.storePath)
-	if err != nil {
-		return fmt.Errorf("failed to read queue data from disk: %w", err)
-	}
-
-	if err := json.Unmarshal(data, &q.messages); err != nil {
-		return fmt.Errorf("failed to unmarshal queue data: %w", err)
-	}
-
-	return nil
+// ResultsCount returns the number of completed job results
+func (q *Queue) ResultsCount() int {
+	return q.resultMgr.Count()
 }
 
 // Clear removes all messages from the queue
@@ -128,5 +149,10 @@ func (q *Queue) Clear() error {
 	defer q.mutex.Unlock()
 
 	q.messages = []Message{}
-	return q.saveToDisk()
+	return q.storage.SaveQueue(q.messages)
+}
+
+// ClearResults removes all stored results
+func (q *Queue) ClearResults() error {
+	return q.resultMgr.Clear()
 }

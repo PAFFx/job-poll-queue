@@ -1,21 +1,37 @@
 package submit
 
 import (
+	"time"
+
 	"github.com/PAFFx/job-poll-queue/queue"
 	"github.com/google/uuid"
 )
 
-func (h *Handler) SubmitJob(jobData string) error {
-	// Add job to queue
-	err := h.jobQueue.Push(queue.Message{
-		ID:      uuid.New().String(),
-		Payload: jobData,
-		Headers: map[string]string{},
-	})
+// DefaultTimeout is the default time to wait for a synchronous job result
+const DefaultTimeout = 30 * time.Second
 
-	if err != nil {
-		return err
+// SubmitJobSync adds a job to the queue and waits for its result
+func (h *Handler) SubmitJobSync(payload string, headers map[string]string, timeout time.Duration) (*queue.Message, error) {
+	// Use default timeout if not specified
+	if timeout <= 0 {
+		timeout = DefaultTimeout
 	}
 
-	return nil
+	// Create a job
+	jobID := uuid.New().String()
+
+	// Create message with provided payload and headers
+	msg := queue.Message{
+		ID:      jobID,
+		Payload: payload,
+		Headers: headers,
+	}
+
+	// Add job to queue
+	if err := h.jobQueue.Push(msg); err != nil {
+		return nil, err
+	}
+
+	// Wait for the result
+	return h.jobQueue.WaitForResult(jobID, timeout)
 }
