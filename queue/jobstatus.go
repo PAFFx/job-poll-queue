@@ -148,6 +148,32 @@ func (jsm *JobStatusManager) WaitForCompletion(jobID string, timeout time.Durati
 	}
 }
 
+// WaitForCompletionWithoutTimeout waits indefinitely for a job to reach completion
+func (jsm *JobStatusManager) WaitForCompletionWithoutTimeout(jobID string) (*Message, error) {
+	jsm.mutex.Lock()
+
+	// Check if we already have the job in completed/failed state
+	if job, exists := jsm.statusMap[jobID]; exists {
+		if job.Status == JobStatusCompleted || job.Status == JobStatusFailed {
+			jsm.mutex.Unlock()
+			return &job, nil
+		}
+	}
+
+	// Get the waiter channel for this job
+	waiter, exists := jsm.waiters[jobID]
+	if !exists {
+		jsm.mutex.Unlock()
+		return nil, errors.New("job not found")
+	}
+
+	jsm.mutex.Unlock()
+
+	// Wait indefinitely for the job to complete
+	job := <-waiter
+	return &job, nil
+}
+
 // GetJobStatus retrieves a job's current status
 func (jsm *JobStatusManager) GetJobStatus(jobID string) (*Message, error) {
 	jsm.mutex.Lock()

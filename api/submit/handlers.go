@@ -1,8 +1,6 @@
 package submit
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/PAFFx/job-poll-queue/queue"
@@ -26,7 +24,6 @@ func (h *Handler) SubmitJobSyncHandler(c *fiber.Ctx) error {
 	type JobRequest struct {
 		Payload string            `json:"payload"`
 		Headers map[string]string `json:"headers,omitempty"`
-		Timeout int               `json:"timeout_seconds,omitempty"` // Optional timeout in seconds
 	}
 
 	var jobReq JobRequest
@@ -34,18 +31,9 @@ func (h *Handler) SubmitJobSyncHandler(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid job data")
 	}
 
-	// Set timeout
-	var timeout time.Duration
-	if jobReq.Timeout > 0 {
-		timeout = time.Duration(jobReq.Timeout) * time.Second
-	}
-
 	// Submit job and wait for result
-	result, err := h.SubmitJobSync(jobReq.Payload, jobReq.Headers, timeout)
+	result, err := h.SubmitJobSync(jobReq.Payload, jobReq.Headers)
 	if err != nil {
-		if err.Error() == "timeout waiting for job result" {
-			return fiber.NewError(fiber.StatusRequestTimeout, "Job processing timed out")
-		}
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to process job: "+err.Error())
 	}
 
