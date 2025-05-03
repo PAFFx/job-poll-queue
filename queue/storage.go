@@ -9,8 +9,8 @@ import (
 
 // Storage handles persistence operations for the queue
 type Storage struct {
-	queuePath  string
-	resultPath string
+	queuePath     string
+	jobStatusPath string
 }
 
 // NewStorage creates a new storage manager
@@ -21,26 +21,26 @@ func NewStorage(name string, storageDir string) (*Storage, error) {
 	}
 
 	return &Storage{
-		queuePath:  filepath.Join(storageDir, fmt.Sprintf("%s.json", name)),
-		resultPath: filepath.Join(storageDir, fmt.Sprintf("%s-results.json", name)),
+		queuePath:     filepath.Join(storageDir, fmt.Sprintf("%s.json", name)),
+		jobStatusPath: filepath.Join(storageDir, fmt.Sprintf("%s-jobstatus.json", name)),
 	}, nil
 }
 
 // SaveQueue persists the queue messages to storage
-func (d *Storage) SaveQueue(messages []Message) error {
+func (s *Storage) SaveQueue(messages []Message) error {
 	data, err := json.Marshal(messages)
 	if err != nil {
 		return fmt.Errorf("failed to marshal queue data: %w", err)
 	}
 
 	// Write to temporary file first to avoid corruption
-	tempFile := d.queuePath + ".tmp"
+	tempFile := s.queuePath + ".tmp"
 	if err := os.WriteFile(tempFile, data, 0644); err != nil {
 		return fmt.Errorf("failed to write queue data to temp file: %w", err)
 	}
 
 	// Rename temp file to actual file (atomic operation)
-	if err := os.Rename(tempFile, d.queuePath); err != nil {
+	if err := os.Rename(tempFile, s.queuePath); err != nil {
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 
@@ -48,17 +48,17 @@ func (d *Storage) SaveQueue(messages []Message) error {
 }
 
 // LoadQueue loads the queue state from storage
-func (d *Storage) LoadQueue() ([]Message, error) {
+func (s *Storage) LoadQueue() ([]Message, error) {
 	var messages []Message
 
 	// Check if file exists
-	_, err := os.Stat(d.queuePath)
+	_, err := os.Stat(s.queuePath)
 	if os.IsNotExist(err) {
 		// No file yet, return empty slice
 		return []Message{}, nil
 	}
 
-	data, err := os.ReadFile(d.queuePath)
+	data, err := os.ReadFile(s.queuePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read queue data from storage: %w", err)
 	}
@@ -70,46 +70,46 @@ func (d *Storage) LoadQueue() ([]Message, error) {
 	return messages, nil
 }
 
-// SaveResults persists the results to storage
-func (d *Storage) SaveResults(results map[string]Message) error {
-	data, err := json.Marshal(results)
+// SaveJobStatus persists the job status records to storage
+func (s *Storage) SaveJobStatus(jobStatus map[string]Message) error {
+	data, err := json.Marshal(jobStatus)
 	if err != nil {
-		return fmt.Errorf("failed to marshal results data: %w", err)
+		return fmt.Errorf("failed to marshal job status data: %w", err)
 	}
 
 	// Write to temporary file first to avoid corruption
-	tempFile := d.resultPath + ".tmp"
+	tempFile := s.jobStatusPath + ".tmp"
 	if err := os.WriteFile(tempFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write results data to temp file: %w", err)
+		return fmt.Errorf("failed to write job status data to temp file: %w", err)
 	}
 
 	// Rename temp file to actual file (atomic operation)
-	if err := os.Rename(tempFile, d.resultPath); err != nil {
+	if err := os.Rename(tempFile, s.jobStatusPath); err != nil {
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 
 	return nil
 }
 
-// LoadResults loads the results from storage
-func (d *Storage) LoadResults() (map[string]Message, error) {
-	results := make(map[string]Message)
+// LoadJobStatus loads the job status records from storage
+func (s *Storage) LoadJobStatus() (map[string]Message, error) {
+	jobStatus := make(map[string]Message)
 
 	// Check if file exists
-	_, err := os.Stat(d.resultPath)
+	_, err := os.Stat(s.jobStatusPath)
 	if os.IsNotExist(err) {
 		// No file yet, return empty map
-		return results, nil
+		return jobStatus, nil
 	}
 
-	data, err := os.ReadFile(d.resultPath)
+	data, err := os.ReadFile(s.jobStatusPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read results data from storage: %w", err)
+		return nil, fmt.Errorf("failed to read job status data from storage: %w", err)
 	}
 
-	if err := json.Unmarshal(data, &results); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal results data: %w", err)
+	if err := json.Unmarshal(data, &jobStatus); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal job status data: %w", err)
 	}
 
-	return results, nil
+	return jobStatus, nil
 }
