@@ -5,7 +5,7 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/PAFFx/job-poll-queue/api"
+	"github.com/PAFFx/job-poll-queue/api/http"
 	"github.com/PAFFx/job-poll-queue/config"
 	"github.com/PAFFx/job-poll-queue/queue"
 )
@@ -21,7 +21,7 @@ func main() {
 	}
 
 	// Create the API server
-	server := api.NewServer(jobQueue)
+	server := http.NewServer(jobQueue)
 
 	// Get port from environment variable or use default
 	envVars, err := config.GetEnvVariables()
