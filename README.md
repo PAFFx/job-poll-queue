@@ -1,11 +1,12 @@
 # Job Queue API
 
-A lightweight synchronous job processing queue with HTTP API.
+A lightweight job processing queue with HTTP and gRPC APIs.
 
 ## Features
 
 - Synchronous job processing
 - RESTful API using Gofiber framework
+- gRPC API for efficient worker communication
 - Persistent storage
 - Thread-safe operations
 
@@ -18,7 +19,7 @@ go mod download
 go build
 ```
 
-## API Endpoints
+## HTTP API Endpoints
 
 ### Client Endpoints
 
@@ -98,12 +99,39 @@ GET /api/admin/next
 GET /health
 ```
 
+## gRPC API
+
+Worker service is also available via gRPC on port 50051 (configurable).
+
+### Methods
+
+- `RequestJob`: Retrieves the next available job
+- `CompleteJob`: Submits results for a processed job
+
+### Testing with grpcurl
+
+```bash
+# List available services
+grpcurl -plaintext localhost:50051 list
+
+# Request a job
+grpcurl -plaintext -d '{}' localhost:50051 worker.WorkerService/RequestJob
+
+# Complete a job
+grpcurl -plaintext -d '{"job_id":"JOB_ID","payload":"result"}' \
+  localhost:50051 worker.WorkerService/CompleteJob
+```
+
 ## Architecture
 
-The system consists of three main components:
+The system now supports dual communication methods:
 
+1. **HTTP API**: Traditional RESTful endpoints for client, worker, and admin operations
+2. **gRPC API**: Efficient binary protocol for worker communication
+
+The core components remain:
 1. **Submit API**: Handles job submissions from clients
-2. **Worker API**: Allows workers to poll for jobs and submit results
+2. **Worker API**: Allows workers to poll for jobs and submit results (via HTTP or gRPC)
 3. **Job Status Manager**: Tracks job state throughout its lifecycle
 
 Jobs submitted by clients are held in a synchronous request until a worker processes the job and returns a result, which is then returned to the client.
@@ -112,16 +140,24 @@ Jobs submitted by clients are held in a synchronous request until a worker proce
 
 ```
 job-poll-queue/
-├── api/               # API implementation
-│   ├── admin/         # Admin API endpoints
-│   ├── submit/        # Client submission endpoints
-│   ├── worker/        # Worker endpoints
-│   └── server.go      # API server and routes
-├── queue/             # Queue implementation
-│   ├── jobstatus.go   # Job status tracking
-│   ├── queue.go       # Main queue functionality
-│   └── storage.go     # Persistence layer
-└── main.go            # Application entry point
+├── api/              # API implementations
+│   ├── http/         # HTTP API endpoints
+│   │   ├── admin/    # Admin HTTP endpoints  
+│   │   ├── submit/   # Client submission endpoints
+│   │   ├── worker/   # Worker HTTP endpoints
+│   │   └── server.go # HTTP server and routes
+│   └── grpc/         # gRPC API endpoints
+│       ├── worker/   # Worker gRPC service
+│       └── server.go # gRPC server
+├── proto/            # Protocol buffer definitions
+│   └── worker/       # Worker service proto definitions
+├── queue/            # Core queue implementation
+│   ├── jobstatus.go  # Job status tracking
+│   ├── queue.go      # Main queue functionality
+│   └── storage.go    # Persistence layer
+├── config/           # Configuration
+│   └── env.go        # Environment variables
+└── main.go           # Application entry point (runs both servers)
 ```
 
 ## License
