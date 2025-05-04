@@ -5,7 +5,8 @@ import (
 )
 
 type EnvVariables struct {
-	Port string `env:"PORT,default=3000"`
+	Port     string `env:"PORT,default=3000"`
+	GrpcPort string `env:"GRPC_PORT,default=50051"`
 }
 
 func GetEnvVariables() (*EnvVariables, error) {
