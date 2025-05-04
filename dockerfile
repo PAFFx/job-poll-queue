@@ -15,5 +15,6 @@ WORKDIR /app
 COPY --from=builder /app/job-poll-queue /app/job-poll-queue
 
 EXPOSE 3000
+EXPOSE 50051
 
 CMD ["./job-poll-queue"]
