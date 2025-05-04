@@ -1,9 +1,9 @@
-package api
+package http
 
 import (
-	"github.com/PAFFx/job-poll-queue/api/admin"
-	"github.com/PAFFx/job-poll-queue/api/submit"
-	"github.com/PAFFx/job-poll-queue/api/worker"
+	"github.com/PAFFx/job-poll-queue/api/http/admin"
+	"github.com/PAFFx/job-poll-queue/api/http/submit"
+	"github.com/PAFFx/job-poll-queue/api/http/worker"
 	"github.com/PAFFx/job-poll-queue/queue"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
